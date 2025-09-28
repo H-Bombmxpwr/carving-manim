@@ -1,0 +1,19 @@
+[build-system]
+requires = ["hatchling>=1.18"]
+build-backend = "hatchling.build"
+
+[project]
+name = "seamcarving-manim"
+version = "0.1.0"
+description = "Manim CE scenes and utils for a seam carving talk"
+authors = [{ name = "Hunter" }]
+requires-python = ">=3.10"
+dependencies = [
+  "manim>=0.19",
+  "numpy",
+  "Pillow",
+  "scipy",
+]
+
+[tool.hatch.build]
+packages = ["src/seamcarving_manim"]

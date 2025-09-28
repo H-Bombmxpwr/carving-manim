@@ -1,0 +1,48 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+
+# --- Virtual environments ---
+.venv/
+venv/
+env/
+ENV/
+
+# --- Manim outputs (large, reproducible) ---
+media/
+cache/
+.manimaudio/
+.manimgl/
+.manim/
+
+# If you export final videos outside media/, uncomment these:
+# *.mp4
+# *.webm
+# *.gif
+# *.wav
+# *.mp3
+
+# --- Build / packaging ---
+build/
+dist/
+*.egg-info/
+
+# --- Editors / OS cruft ---
+.vscode/
+.idea/
+*.code-workspace
+.DS_Store
+Thumbs.db
+
+# --- Logs / misc ---
+*.log
+.ipynb_checkpoints/
+.ruff_cache/
+.pytest_cache/
+.mypy_cache/
+
+# --- Local config you don’t want in git ---
+*.env
+*.env.*
