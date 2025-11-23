@@ -1,25 +1,632 @@
-# src/seamcarving_manim/scenes/s20_energy_map.py
 from manim import *
 import numpy as np
-from PIL import Image
-from importlib.resources import files
+from scipy.ndimage import convolve
 
-from seamcarving_manim.utils.seam_carving_core import energy_map
 from seamcarving_manim.style import H1, caption
 
-class EnergyMapScene(Scene):
+
+class EdgeDetectionScene(Scene):
     def construct(self):
-        title = H1("Energy map (Sobel magnitude on luminance)").to_edge(UP)
-        self.play(Write(title))
+        # ---- look & pacing ----
+        self.camera.background_color = "#0a0a0a"
+        TITLE_RT = 0.8
+        CAP_RT = 0.8
+        HOLD = 1.2
+        CONV_STEP_TIME = 0.15
 
-        img_path = files("seamcarving_manim.assets.images").joinpath("beach.jpg")
-        img = np.array(Image.open(img_path).convert("RGB")) / 255.0
-        E = energy_map(img)
+        # ---- title ----
+        title = H1("Edge Detection: Finding Image Gradients").to_edge(UP, buff=0.5)
+        self.play(Write(title), run_time=TITLE_RT)
+        self.wait(HOLD)
 
-        left = ImageMobject((img * 255).astype("uint8")).scale(0.8).to_edge(LEFT)
-        right = ImageMobject(np.uint8(255 * (E / E.max()))).scale(0.8).to_edge(RIGHT).set_color_map("inferno")
+        # ---- Create grayscale circle (11x11 for more detail) ----
+        size = 11
+        circle_pattern = np.zeros((size, size), dtype=np.uint8)
+        center = size // 2
+        for i in range(size):
+            for j in range(size):
+                dist = np.sqrt((i - center)**2 + (j - center)**2)
+                if dist <= 3.0:
+                    circle_pattern[i, j] = 255
+                elif dist <= 3.5:
+                    circle_pattern[i, j] = 200
+                elif dist <= 4.0:
+                    circle_pattern[i, j] = 150
+                elif dist <= 4.5:
+                    circle_pattern[i, j] = 100
+                elif dist <= 5.0:
+                    circle_pattern[i, j] = 50
 
-        self.play(FadeIn(left), FadeIn(right))
-        self.play(FadeIn(caption("Original").next_to(left, DOWN, buff=0.2)))
-        self.play(FadeIn(caption("High gradients = high energy").next_to(right, DOWN, buff=0.2)))
+        # ---- Display pixel grid LEFT ----
+        pixel_size = 0.45
+        grid = VGroup()
+        pixel_squares = {}
+        
+        for i in range(size):
+            for j in range(size):
+                val = circle_pattern[i, j]
+                color = interpolate_color(BLACK, WHITE, val / 255.0)
+                square = Square(
+                    side_length=pixel_size,
+                    fill_color=color,
+                    fill_opacity=1.0,
+                    stroke_color=GRAY,
+                    stroke_width=1
+                )
+                square.move_to(np.array([
+                    (j - center) * pixel_size,
+                    (center - i) * pixel_size,
+                    0
+                ]))
+                
+                # Add intensity value as text inside square
+                intensity_text = Text(str(val), font_size=12, color=RED if val < 128 else BLACK)
+                intensity_text.move_to(square.get_center())
+                
+                pixel_squares[(i, j)] = square
+                grid.add(square, intensity_text)
+        
+        grid.shift(LEFT * 4.5)
+        
+        intro_cap = caption("Grayscale circle with smooth gradient edges").next_to(grid, DOWN, buff=0.5)
+        self.play(
+            FadeIn(grid, lag_ratio=0.05),
+            FadeIn(intro_cap, shift=UP*0.1),
+            run_time=1.5
+        )
+        self.wait(HOLD * 1.5)
+        
+        # Remove title and caption
+        self.play(
+            FadeOut(title),
+            FadeOut(intro_cap),
+            run_time=0.6
+        )
         self.wait(0.5)
+
+        # ---- Explain Sobel X Filter Concept ----
+        explain_cap1 = caption("Sobel filters detect edges by finding intensity changes").to_edge(DOWN, buff=1.2)
+        self.play(FadeIn(explain_cap1, shift=UP*0.1), run_time=CAP_RT)
+        self.wait(HOLD * 1.5)
+        
+        # Show Sobel X kernel
+        sobel_x_values = [[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]]
+        sobel_x_matrix = Matrix(sobel_x_values, left_bracket="[", right_bracket="]").scale(0.6)
+        sobel_x_matrix.shift(RIGHT * 3 + UP * 1.5)
+        sobel_x_label = Text("Sobel X Kernel", font_size=24, color=RED).next_to(sobel_x_matrix, UP, buff=0.2)
+        
+        self.play(
+            Write(sobel_x_matrix),
+            Write(sobel_x_label),
+            run_time=1.2
+        )
+        self.wait(HOLD)
+        
+        self.play(FadeOut(explain_cap1, shift=DOWN*0.1), run_time=0.3)
+        explain_cap2 = caption("Left column: -1, -2, -1  →  detects dark pixels on left").next_to(sobel_x_matrix, DOWN, buff=0.8)
+        explain_cap2.set_color(BLUE)
+        self.play(FadeIn(explain_cap2, shift=UP*0.1), run_time=CAP_RT)
+        
+        # Highlight left column
+        left_highlight = VGroup(*[
+            sobel_x_matrix.get_entries()[i].copy().set_color(BLUE).scale(1.2)
+            for i in [0, 3, 6]
+        ])
+        self.play(FadeIn(left_highlight, scale=1.2), run_time=0.8)
+        self.wait(HOLD)
+        
+        self.play(FadeOut(explain_cap2, shift=DOWN*0.1), run_time=0.3)
+        explain_cap3 = caption("Right column: +1, +2, +1  →  detects bright pixels on right").next_to(sobel_x_matrix, DOWN, buff=0.8)
+        explain_cap3.set_color(YELLOW)
+        self.play(FadeIn(explain_cap3, shift=UP*0.1), run_time=CAP_RT)
+        
+        # Highlight right column
+        right_highlight = VGroup(*[
+            sobel_x_matrix.get_entries()[i].copy().set_color(YELLOW).scale(1.2)
+            for i in [2, 5, 8]
+        ])
+        self.play(
+            FadeOut(left_highlight),
+            FadeIn(right_highlight, scale=1.2),
+            run_time=0.8
+        )
+        self.wait(HOLD)
+        
+        self.play(FadeOut(explain_cap3, shift=DOWN*0.1), run_time=0.3)
+        explain_cap4 = caption("Result: positive when bright→left, negative when dark→left").next_to(sobel_x_matrix, DOWN, buff=0.8)
+        explain_cap4.set_color(GREEN)
+        self.play(FadeIn(explain_cap4, shift=UP*0.1), run_time=CAP_RT)
+        self.wait(HOLD * 2)
+        
+        self.play(
+            FadeOut(right_highlight),
+            FadeOut(explain_cap4, shift=DOWN*0.1),
+            run_time=0.6
+        )
+        
+        # Remove Sobel X matrix before showing example
+        self.play(
+            FadeOut(sobel_x_matrix),
+            FadeOut(sobel_x_label),
+            run_time=0.6
+        )
+        
+        # Show visual example of convolution operation - on edge of circle
+        explain_cap5 = caption("Example: multiply each pixel by kernel weight, then sum").to_edge(DOWN, buff=0.8)
+        explain_cap5.set_color(PURPLE)
+        self.play(FadeIn(explain_cap5, shift=UP*0.1), run_time=CAP_RT)
+        
+        # Pick a spot on the edge with good gradient
+        example_i, example_j = 4, 7  # Right edge of circle
+        
+        # Create Sobel X kernel display on the left
+        kernel_display = VGroup()
+        kernel_matrix_pos = LEFT * 2 + UP * 1
+        
+        for di in [-1, 0, 1]:
+            for dj in [-1, 0, 1]:
+                kernel_val = sobel_x_values[di + 1][dj + 1]
+                pixel_val = int(circle_pattern[example_i + di, example_j + dj])
+                
+                # Create box with kernel value
+                box = Square(side_length=0.6, fill_color=PURPLE, fill_opacity=0.2, stroke_color=PURPLE, stroke_width=2)
+                box.move_to(kernel_matrix_pos + RIGHT * dj * 0.65 + DOWN * di * 0.65)
+                
+                kernel_text = Text(f"{kernel_val}", font_size=20, color=WHITE, weight=BOLD)
+                kernel_text.move_to(box.get_center() + UP * 0.12)
+                
+                pixel_text = Text(f"×{pixel_val}", font_size=16, color=GRAY)
+                pixel_text.move_to(box.get_center() + DOWN * 0.12)
+                
+                kernel_display.add(box, kernel_text, pixel_text)
+        
+        # Highlight the 3x3 region on image
+        example_region = VGroup()
+        for di in [-1, 0, 1]:
+            for dj in [-1, 0, 1]:
+                h = pixel_squares[(example_i + di, example_j + dj)].copy()
+                h.set_stroke(color=PURPLE, width=4)
+                example_region.add(h)
+        
+        self.play(
+            Create(example_region),
+            FadeIn(kernel_display, shift=RIGHT * 0.3),
+            run_time=1.0
+        )
+        self.wait(HOLD)
+        
+        # Show individual multiplications on the right with larger text
+        calculation_group = VGroup()
+        calc_title = Text("Multiplications:", font_size=18, color=PURPLE).shift(RIGHT * 4.5 + UP * 2.8)
+        calculation_group.add(calc_title)
+        
+        y_offset = 2.2
+        for di in [-1, 0, 1]:
+            for dj in [-1, 0, 1]:
+                pixel_val = int(circle_pattern[example_i + di, example_j + dj])
+                kernel_val = sobel_x_values[di + 1][dj + 1]
+                product = pixel_val * kernel_val
+                
+                calc_text = Text(
+                    f"{pixel_val} × {kernel_val:+d} = {product:+d}",
+                    font_size=16,
+                    color=PURPLE
+                ).shift(RIGHT * 4.5 + UP * (y_offset - (di * 3 + dj) * 0.28))
+                calculation_group.add(calc_text)
+        
+        self.play(
+            LaggedStart(*[FadeIn(calc, shift=LEFT*0.2) for calc in calculation_group[1:]], lag_ratio=0.15),
+            FadeIn(calc_title),
+            run_time=2.5
+        )
+        self.wait(HOLD * 1.5)
+        
+        self.play(
+            FadeOut(example_region),
+            FadeOut(kernel_display),
+            FadeOut(calculation_group),
+            FadeOut(explain_cap5, shift=DOWN*0.1),
+            run_time=0.8
+        )
+        self.wait(0.5)
+
+        # ---- Part 1: Apply Sobel X ----
+        sobel_x_cap = caption("Applying Sobel X: detects vertical edges").to_edge(DOWN, buff=0.8)
+        sobel_x_cap.set_color(RED)
+        self.play(FadeIn(sobel_x_cap, shift=UP*0.1), run_time=CAP_RT)
+        
+        # Show Sobel X kernel again
+        sobel_x_matrix = Matrix(sobel_x_values, left_bracket="[", right_bracket="]").scale(0.6)
+        sobel_x_matrix.shift(UP * 2.5)
+        sobel_x_label = Text("Sobel X", font_size=24, color=RED).next_to(sobel_x_matrix, UP, buff=0.2)
+        
+        self.play(
+            Write(sobel_x_matrix),
+            Write(sobel_x_label),
+            run_time=0.8
+        )
+        self.wait(HOLD * 0.5)
+        
+        # Create result grid on the RIGHT for X gradient
+        result_x_grid = VGroup()
+        result_x_squares = {}
+        
+        # Compute actual Sobel X convolution
+        sobel_x_kernel = np.array(sobel_x_values)
+        grad_x = convolve(circle_pattern.astype(float), sobel_x_kernel, mode='constant')
+        
+        # Normalize for display
+        grad_x_max = np.abs(grad_x).max()
+        grad_x_normalized = np.clip(np.abs(grad_x) / grad_x_max * 255, 0, 255).astype(np.uint8)
+        
+        for i in range(size):
+            for j in range(size):
+                val = grad_x_normalized[i, j]
+                color = interpolate_color(BLACK, RED, val / 255.0)
+                square = Square(
+                    side_length=pixel_size,
+                    fill_color=color,
+                    fill_opacity=1.0,
+                    stroke_color=GRAY,
+                    stroke_width=1
+                )
+                square.move_to(np.array([
+                    (j - center) * pixel_size,
+                    (center - i) * pixel_size,
+                    0
+                ]))
+                result_x_squares[(i, j)] = square
+                result_x_grid.add(square)
+        
+        result_x_grid.shift(RIGHT * 1.5)
+        result_x_grid.set_opacity(0)
+        self.add(result_x_grid)
+        
+        result_x_label = Text("∂I/∂x", font_size=24, color=RED).next_to(result_x_grid, DOWN, buff=0.3)
+        
+        # Animate convolution process with Sobel values shown
+        self.play(
+            FadeOut(sobel_x_matrix),
+            FadeOut(sobel_x_label),
+            run_time=0.5
+        )
+        
+        for i in range(1, size - 1):
+            for j in range(1, size - 1):
+                # Show 3x3 Sobel kernel overlay
+                kernel_overlay = VGroup()
+                for di in [-1, 0, 1]:
+                    for dj in [-1, 0, 1]:
+                        pos = pixel_squares[(i + di, j + dj)].get_center()
+                        kernel_val = sobel_x_values[di + 1][dj + 1]
+                        
+                        # Highlight square
+                        h = pixel_squares[(i + di, j + dj)].copy()
+                        h.set_stroke(color=RED, width=3)
+                        
+                        # Show kernel value
+                        kernel_text = Text(
+                            f"[{kernel_val}]",
+                            font_size=10,
+                            color=RED,
+                            weight=BOLD
+                        ).move_to(pos + UP * 0.15)
+                        
+                        kernel_overlay.add(h, kernel_text)
+                
+                self.add(kernel_overlay)
+                
+                # Show result value on result grid
+                result_val = int(grad_x[i, j])
+                result_text = Text(
+                    str(result_val),
+                    font_size=12,
+                    color=WHITE
+                ).move_to(result_x_squares[(i, j)].get_center())
+                
+                result_x_squares[(i, j)].set_opacity(1)
+                self.add(result_text)
+                
+                self.wait(CONV_STEP_TIME)
+                self.remove(kernel_overlay)
+        
+        self.play(FadeIn(result_x_label, shift=UP*0.1), run_time=0.5)
+        self.wait(HOLD)
+
+        # Show X vectors on EVERY pixel with edges
+        self.play(FadeOut(sobel_x_cap, shift=DOWN*0.1), run_time=0.3)
+        vector_x_cap = caption("Gradient vectors show direction and magnitude of change").to_edge(DOWN, buff=0.8)
+        vector_x_cap.set_color(RED)
+        self.play(FadeIn(vector_x_cap, shift=UP*0.1), run_time=CAP_RT)
+        
+        x_vectors = VGroup()
+        for i in range(1, size - 1):
+            for j in range(1, size - 1):
+                gx_val = grad_x[i, j]
+                if abs(gx_val) > 20:  # Threshold for visibility
+                    pos = result_x_squares[(i, j)].get_center()
+                    mag = gx_val / grad_x_max * 0.8  # Scale for visibility
+                    vec = Arrow(
+                        start=pos,
+                        end=pos + RIGHT * mag,
+                        color=RED,
+                        stroke_width=2,
+                        buff=0,
+                        max_tip_length_to_length_ratio=0.35,
+                        max_stroke_width_to_length_ratio=8
+                    )
+                    x_vectors.add(vec)
+        
+        self.play(
+            LaggedStart(*[GrowArrow(v) for v in x_vectors], lag_ratio=0.02),
+            run_time=2.5
+        )
+        self.wait(HOLD * 1.5)
+
+        # ---- Clean up for Sobel Y ----
+        self.play(
+            FadeOut(vector_x_cap, shift=DOWN*0.1),
+            FadeOut(sobel_x_matrix),
+            FadeOut(sobel_x_label),
+            FadeOut(result_x_grid),
+            FadeOut(result_x_label),
+            FadeOut(x_vectors),
+            run_time=1.0
+        )
+        self.wait(0.5)
+
+        # ---- Part 2: Apply Sobel Y ----
+        sobel_y_cap = caption("Applying Sobel Y: detects horizontal edges").to_edge(DOWN, buff=0.8)
+        sobel_y_cap.set_color(BLUE)
+        self.play(FadeIn(sobel_y_cap, shift=UP*0.1), run_time=CAP_RT)
+        
+        # Show Sobel Y kernel
+        sobel_y_values = [[-1, -2, -1], [0, 0, 0], [1, 2, 1]]
+        sobel_y_matrix = Matrix(sobel_y_values, left_bracket="[", right_bracket="]").scale(0.6)
+        sobel_y_matrix.shift(RIGHT * 3 + UP * 1.5)
+        sobel_y_label = Text("Sobel Y Kernel", font_size=24, color=BLUE).next_to(sobel_y_matrix, UP, buff=0.2)
+        
+        self.play(
+            Write(sobel_y_matrix),
+            Write(sobel_y_label),
+            run_time=1.2
+        )
+        self.wait(HOLD)
+
+        # Create result grid for Y gradient
+        result_y_grid = VGroup()
+        result_y_squares = {}
+        
+        # Compute actual Sobel Y convolution
+        sobel_y_kernel = np.array(sobel_y_values)
+        grad_y = convolve(circle_pattern.astype(float), sobel_y_kernel, mode='constant')
+        
+        # Normalize for display
+        grad_y_max = np.abs(grad_y).max()
+        grad_y_normalized = np.clip(np.abs(grad_y) / grad_y_max * 255, 0, 255).astype(np.uint8)
+        
+        for i in range(size):
+            for j in range(size):
+                val = grad_y_normalized[i, j]
+                color = interpolate_color(BLACK, BLUE, val / 255.0)
+                square = Square(
+                    side_length=pixel_size,
+                    fill_color=color,
+                    fill_opacity=0.0,  # Start invisible
+                    stroke_color=GRAY,
+                    stroke_width=1
+                )
+                square.move_to(np.array([
+                    (j - center) * pixel_size,
+                    (center - i) * pixel_size,
+                    0
+                ]))
+                result_y_squares[(i, j)] = square
+                result_y_grid.add(square)
+        
+        result_y_grid.shift(RIGHT * 1.5)
+        result_y_grid.set_opacity(0)
+        self.add(result_y_grid)
+        
+        result_y_label = Text("∂I/∂y", font_size=24, color=BLUE).next_to(result_y_grid, DOWN, buff=0.3)
+        
+        # Animate convolution
+        for i in range(1, size - 1):
+            for j in range(1, size - 1):
+                highlight = VGroup()
+                for di in [-1, 0, 1]:
+                    for dj in [-1, 0, 1]:
+                        h = pixel_squares[(i + di, j + dj)].copy()
+                        h.set_stroke(color=YELLOW, width=3)
+                        highlight.add(h)
+                
+                self.add(highlight)
+                result_y_squares[(i, j)].set_opacity(1)
+                self.wait(CONV_STEP_TIME)
+                self.remove(highlight)
+        
+        self.play(FadeIn(result_y_label, shift=UP*0.1), run_time=0.5)
+        self.wait(HOLD)
+
+        # Show Y vectors
+        self.play(FadeOut(sobel_y_cap, shift=DOWN*0.1), run_time=0.3)
+        vector_y_cap = caption("Y-gradients point in vertical direction").to_edge(DOWN, buff=0.8)
+        vector_y_cap.set_color(BLUE)
+        self.play(FadeIn(vector_y_cap, shift=UP*0.1), run_time=CAP_RT)
+        
+        y_vectors = VGroup()
+        for i in range(1, size - 1):
+            for j in range(1, size - 1):
+                gy_val = grad_y[i, j]
+                if abs(gy_val) > 20:
+                    pos = result_y_squares[(i, j)].get_center()
+                    mag = gy_val / grad_y_max * 0.8
+                    vec = Arrow(
+                        start=pos,
+                        end=pos + DOWN * mag,
+                        color=BLUE,
+                        stroke_width=2,
+                        buff=0,
+                        max_tip_length_to_length_ratio=0.35,
+                        max_stroke_width_to_length_ratio=8
+                    )
+                    y_vectors.add(vec)
+        
+        self.play(
+            LaggedStart(*[GrowArrow(v) for v in y_vectors], lag_ratio=0.02),
+            run_time=2.5
+        )
+        self.wait(HOLD * 1.5)
+
+        # ---- Combine on original image ----
+        self.play(
+            FadeOut(vector_y_cap, shift=DOWN*0.1),
+            FadeOut(result_y_grid),
+            FadeOut(result_y_label),
+            FadeOut(y_vectors),
+            run_time=1.0
+        )
+        
+        combine_cap = caption("Combining X and Y gradients into single edge detection").to_edge(DOWN, buff=0.8)
+        combine_cap.set_color(GREEN)
+        self.play(FadeIn(combine_cap, shift=UP*0.1), run_time=CAP_RT)
+        
+        # Center the grid and bring back X vectors temporarily
+        self.play(
+            grid.animate.shift(RIGHT * 4.5),
+            run_time=1.0
+        )
+        
+        # Show X vectors on centered image in RED
+        x_vectors_centered = VGroup()
+        for i in range(1, size - 1):
+            for j in range(1, size - 1):
+                gx_val = grad_x[i, j]
+                if abs(gx_val) > 20:
+                    pos = pixel_squares[(i, j)].get_center()
+                    mag = gx_val / grad_x_max * 0.8
+                    vec = Arrow(
+                        start=pos,
+                        end=pos + RIGHT * mag,
+                        color=RED,
+                        stroke_width=2,
+                        buff=0,
+                        max_tip_length_to_length_ratio=0.35,
+                        max_stroke_width_to_length_ratio=8
+                    )
+                    x_vectors_centered.add(vec)
+        
+        self.play(
+            LaggedStart(*[GrowArrow(v) for v in x_vectors_centered], lag_ratio=0.01),
+            run_time=1.5
+        )
+        self.wait(HOLD * 0.5)
+        
+        # Add Y vectors in BLUE
+        y_vectors_centered = VGroup()
+        for i in range(1, size - 1):
+            for j in range(1, size - 1):
+                gy_val = grad_y[i, j]
+                if abs(gy_val) > 20:
+                    pos = pixel_squares[(i, j)].get_center()
+                    mag = gy_val / grad_y_max * 0.8
+                    vec = Arrow(
+                        start=pos,
+                        end=pos + DOWN * mag,
+                        color=BLUE,
+                        stroke_width=2,
+                        buff=0,
+                        max_tip_length_to_length_ratio=0.35,
+                        max_stroke_width_to_length_ratio=8
+                    )
+                    y_vectors_centered.add(vec)
+        
+        self.play(
+            LaggedStart(*[GrowArrow(v) for v in y_vectors_centered], lag_ratio=0.01),
+            run_time=1.5
+        )
+        self.wait(HOLD)
+        
+        # Now show combined gradient vectors (GREEN)
+        self.play(FadeOut(combine_cap, shift=DOWN*0.1), run_time=0.3)
+        combined_cap = caption("Combined gradient vectors ∇I = (∂I/∂x, ∂I/∂y)").to_edge(DOWN, buff=0.8)
+        combined_cap.set_color(GREEN)
+        self.play(FadeIn(combined_cap, shift=UP*0.1), run_time=CAP_RT)
+        
+        # Show combined gradient vectors on original image
+        gradient_vectors = VGroup()
+        for i in range(1, size - 1):
+            for j in range(1, size - 1):
+                gx_val = grad_x[i, j]
+                gy_val = grad_y[i, j]
+                magnitude_val = np.sqrt(gx_val**2 + gy_val**2)
+                
+                if magnitude_val > 30:
+                    pos = pixel_squares[(i, j)].get_center()
+                    # Normalize by maximum magnitude for consistent scaling
+                    max_mag = np.sqrt(grad_x_max**2 + grad_y_max**2)
+                    scale = magnitude_val / max_mag * 0.7
+                    vec = Arrow(
+                        start=pos,
+                        end=pos + RIGHT * (gx_val / magnitude_val * scale) + DOWN * (gy_val / magnitude_val * scale),
+                        color=GREEN,
+                        stroke_width=2,
+                        buff=0,
+                        max_tip_length_to_length_ratio=0.35,
+                        max_stroke_width_to_length_ratio=8
+                    )
+                    gradient_vectors.add(vec)
+        
+        # Transform red and blue vectors into green combined vectors - LOCALIZED
+        transforms = []
+        for i in range(min(len(x_vectors_centered), len(y_vectors_centered), len(gradient_vectors))):
+            # Get corresponding x, y, and gradient vectors at same position
+            x_vec = x_vectors_centered[i]
+            y_vec = y_vectors_centered[i]
+            grad_vec = gradient_vectors[i]
+            
+            # Create local transformation for each vector
+            transforms.append(Transform(VGroup(x_vec, y_vec).copy(), grad_vec))
+        
+        self.play(
+            FadeOut(x_vectors_centered),
+            FadeOut(y_vectors_centered),
+            *[GrowArrow(v) for v in gradient_vectors],
+            run_time=2.0
+        )
+        self.wait(HOLD * 2)
+
+        # ---- Show magnitude (edge map) ----
+        self.play(FadeOut(combined_cap, shift=DOWN*0.1), run_time=0.3)
+        magnitude_cap = caption("Taking magnitude: |∇I| = √((∂I/∂x)² + (∂I/∂y)²)").to_edge(DOWN, buff=0.8)
+        magnitude_cap.set_color(YELLOW)
+        self.play(FadeIn(magnitude_cap, shift=UP*0.1), run_time=CAP_RT)
+        
+        # Compute magnitude
+        magnitude = np.sqrt(grad_x**2 + grad_y**2)
+        magnitude_normalized = np.clip(magnitude / magnitude.max() * 255, 0, 255).astype(np.uint8)
+        
+        # Animate transition to magnitude display
+        self.play(FadeOut(gradient_vectors), run_time=0.8)
+        
+        for i in range(size):
+            for j in range(size):
+                val = magnitude_normalized[i, j]
+                color = interpolate_color(BLACK, YELLOW, val / 255.0)
+                pixel_squares[(i, j)].animate.set_fill(color, opacity=1.0)
+        
+        self.play(
+            *[pixel_squares[(i, j)].animate.set_fill(
+                interpolate_color(BLACK, YELLOW, magnitude_normalized[i, j] / 255.0),
+                opacity=1.0
+            ) for i in range(size) for j in range(size)],
+            run_time=2.0
+        )
+        self.wait(HOLD * 2)
+
+        # Final summary
+        self.play(FadeOut(magnitude_cap, shift=DOWN*0.1), run_time=0.3)
+        summary = caption("This edge map identifies important features to preserve during seam carving").to_edge(DOWN, buff=0.5)
+        summary.set_color(GREEN)
+        self.play(FadeIn(summary, shift=UP*0.1), run_time=CAP_RT)
+        self.wait(HOLD * 3)
