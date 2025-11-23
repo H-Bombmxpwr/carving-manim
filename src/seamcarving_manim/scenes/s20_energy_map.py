@@ -91,8 +91,20 @@ class EdgeDetectionScene(Scene):
         
         # Show Sobel X kernel
         sobel_x_values = [[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]]
-        sobel_x_matrix = Matrix(sobel_x_values, left_bracket="[", right_bracket="]").scale(0.6)
-        sobel_x_matrix.shift(RIGHT * 3 + UP * 1.5)
+        
+        def create_kernel_matrix(values, color, position):
+            """Create a 3x3 kernel matrix display"""
+            matrix_group = VGroup()
+            for i in range(3):
+                for j in range(3):
+                    num = Text(str(values[i][j]), font_size=24, color=WHITE)
+                    num.move_to(position + RIGHT * (j - 1) * 0.5 + DOWN * (i - 1) * 0.5)
+                    matrix_group.add(num)
+            left_bracket = Text("[", font_size=50, color=color).next_to(matrix_group, LEFT, buff=0.1)
+            right_bracket = Text("]", font_size=50, color=color).next_to(matrix_group, RIGHT, buff=0.1)
+            return VGroup(left_bracket, matrix_group, right_bracket)
+        
+        sobel_x_matrix = create_kernel_matrix(sobel_x_values, RED, RIGHT * 3 + UP * 1.5)
         sobel_x_label = Text("Sobel X Kernel", font_size=24, color=RED).next_to(sobel_x_matrix, UP, buff=0.2)
         
         self.play(
@@ -107,12 +119,16 @@ class EdgeDetectionScene(Scene):
         explain_cap2.set_color(BLUE)
         self.play(FadeIn(explain_cap2, shift=UP*0.1), run_time=CAP_RT)
         
-        # Highlight left column
-        left_highlight = VGroup(*[
-            sobel_x_matrix.get_entries()[i].copy().set_color(BLUE).scale(1.2)
-            for i in [0, 3, 6]
-        ])
-        self.play(FadeIn(left_highlight, scale=1.2), run_time=0.8)
+        # Highlight left column by changing color
+        left_indices = [0, 3, 6]  # Indices in the matrix_group
+        for i in left_indices:
+            sobel_x_matrix[1][i].set_color(BLUE)  # matrix_group is index 1
+        
+        self.play(
+            *[Indicate(sobel_x_matrix[1][i], color=BLUE, scale_factor=1.2) 
+              for i in left_indices],
+            run_time=0.8
+        )
         self.wait(HOLD)
         
         self.play(FadeOut(explain_cap2, shift=DOWN*0.1), run_time=0.3)
@@ -120,15 +136,21 @@ class EdgeDetectionScene(Scene):
         explain_cap3.set_color(YELLOW)
         self.play(FadeIn(explain_cap3, shift=UP*0.1), run_time=CAP_RT)
         
-        # Highlight right column
-        right_highlight = VGroup(*[
-            sobel_x_matrix.get_entries()[i].copy().set_color(YELLOW).scale(1.2)
-            for i in [2, 5, 8]
-        ])
+         # Highlight right column by changing color
+        right_indices = [2, 5, 8]
+        for i in right_indices:
+            sobel_x_matrix[1][i].set_color(YELLOW)
+        
         self.play(
-            FadeOut(left_highlight),
-            FadeIn(right_highlight, scale=1.2),
+            *[Indicate(sobel_x_matrix[1][i], color=YELLOW, scale_factor=1.2) 
+              for i in right_indices],
             run_time=0.8
+        )
+        self.wait(HOLD)
+        
+        self.play(
+            FadeOut(explain_cap3, shift=DOWN*0.1),
+            run_time=0.6
         )
         self.wait(HOLD)
         
@@ -139,10 +161,9 @@ class EdgeDetectionScene(Scene):
         self.wait(HOLD * 2)
         
         self.play(
-            FadeOut(right_highlight),
             FadeOut(explain_cap4, shift=DOWN*0.1),
             run_time=0.6
-        )
+            )
         
         # Remove Sobel X matrix before showing example
         self.play(
@@ -236,8 +257,7 @@ class EdgeDetectionScene(Scene):
         self.play(FadeIn(sobel_x_cap, shift=UP*0.1), run_time=CAP_RT)
         
         # Show Sobel X kernel again
-        sobel_x_matrix = Matrix(sobel_x_values, left_bracket="[", right_bracket="]").scale(0.6)
-        sobel_x_matrix.shift(UP * 2.5)
+        sobel_x_matrix = create_kernel_matrix(sobel_x_values, RED, ORIGIN + UP * 2.5)
         sobel_x_label = Text("Sobel X", font_size=24, color=RED).next_to(sobel_x_matrix, UP, buff=0.2)
         
         self.play(
@@ -382,8 +402,7 @@ class EdgeDetectionScene(Scene):
         
         # Show Sobel Y kernel
         sobel_y_values = [[-1, -2, -1], [0, 0, 0], [1, 2, 1]]
-        sobel_y_matrix = Matrix(sobel_y_values, left_bracket="[", right_bracket="]").scale(0.6)
-        sobel_y_matrix.shift(RIGHT * 3 + UP * 1.5)
+        sobel_y_matrix = create_kernel_matrix(sobel_y_values, BLUE, RIGHT * 3 + UP * 1.5)
         sobel_y_label = Text("Sobel Y Kernel", font_size=24, color=BLUE).next_to(sobel_y_matrix, UP, buff=0.2)
         
         self.play(
