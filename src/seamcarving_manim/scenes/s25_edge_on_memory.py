@@ -80,6 +80,9 @@ class EdgeOnMemoryScene(Scene):
             FadeIn(cap_x, shift=UP * 0.1),
             run_time=1.0,
         )
+        label_x = Text("∂I/∂x   (Sobel X)", font_size=22, color=RED).next_to(edge_x, DOWN, buff=0.2)
+        self.play(FadeIn(label_x, shift=UP * 0.1), run_time=0.5)
+
         self.wait(HOLD * 1.3)
 
         # pulse the edges a bit
@@ -90,10 +93,12 @@ class EdgeOnMemoryScene(Scene):
         # --- Step 3: Sobel Y (horizontal edges) ---
         self.play(
             FadeOut(edge_x),
+            FadeOut(label_x),
             FadeOut(cap_x, shift=DOWN * 0.1),
-            orig.animate.shift(RIGHT * 7.2),  # from left to right side
+            orig.animate.shift(RIGHT * 7.2),
             run_time=1.0,
         )
+
 
         edge_y.next_to(orig, LEFT, buff=0.8)
 
@@ -105,6 +110,10 @@ class EdgeOnMemoryScene(Scene):
             FadeIn(cap_y, shift=UP * 0.1),
             run_time=1.0,
         )
+        label_y = Text("∂I/∂y   (Sobel Y)", font_size=22,   color=BLUE).next_to(edge_y, DOWN, buff=0.2)
+
+        self.play(FadeIn(label_y, shift=UP * 0.1), run_time=0.5)
+
         self.wait(HOLD * 1.3)
 
         self.play(edge_y.animate.scale(1.03), run_time=0.4)
@@ -113,11 +122,13 @@ class EdgeOnMemoryScene(Scene):
 
         # --- Step 4: bring both edges in and combine into full edge map ---
         self.play(
-            FadeOut(cap_y, shift=DOWN * 0.1),
-            FadeOut(orig),
-            FadeOut(edge_y),
-            run_time=0.7,
-        )
+                FadeOut(cap_y, shift=DOWN * 0.1),
+                FadeOut(orig),
+                FadeOut(edge_y),
+                FadeOut(label_y),
+                run_time=0.7,
+            )
+
 
         # small X and Y on left/right, combined in center
         edge_mag.move_to(ORIGIN)
@@ -142,6 +153,11 @@ class EdgeOnMemoryScene(Scene):
         # "Cool" combination animation: X + Y collapse into center and crossfade to |∇I|
         edge_mag.set_opacity(0.0)
         self.add(edge_mag)
+        label_mag = Text("|∇I|  (edge magnitude)", font_size=24, color=GREEN)\
+        .next_to(edge_mag, DOWN, buff=0.3)
+
+        self.play(FadeIn(label_mag, shift=UP * 0.1), run_time=0.6)
+
 
         self.play(
             edge_x_small.animate.move_to(edge_mag.get_center()).scale(0.9),
@@ -162,3 +178,8 @@ class EdgeOnMemoryScene(Scene):
         # final beat: zoom the edge map slightly
         self.play(edge_mag.animate.scale(1.05), run_time=0.6)
         self.wait(1.0)
+
+        self.wait(1.0)
+
+        self.play(FadeOut(label_mag), run_time=0.6)
+
