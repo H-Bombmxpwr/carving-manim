@@ -1,21 +1,27 @@
 # tools/precompute_memory_edges.py
-from importlib.resources import files
-from pathlib import Path
 
+from pathlib import Path
 import numpy as np
 from PIL import Image
 from scipy.ndimage import convolve, gaussian_filter, maximum_filter
 
-# Locate the *installed* assets/images folder
-assets_root = files("seamcarving_manim.assets.images")
-src_path    = assets_root.joinpath("memory.jpg")
+# -----------------------------------------
+# Resolve PROJECT ROOT (this file is at repo root)
+# -----------------------------------------
+PROJECT_ROOT = Path(__file__).resolve().parent
 
-# Output dir inside the installed package
-edges_dir = assets_root.joinpath("memory_edges")
-Path(edges_dir).mkdir(parents=True, exist_ok=True)
+ASSETS_DIR = PROJECT_ROOT / "src" / "seamcarving_manim" / "assets" / "images"
+SRC_PATH   = ASSETS_DIR / "memory.jpg"
 
-# Load original
-img = Image.open(src_path).convert("L")  # grayscale
+EDGES_DIR  = ASSETS_DIR / "memory_edges"
+EDGES_DIR.mkdir(parents=True, exist_ok=True)
+
+print("Project root:", PROJECT_ROOT)
+print("Reading from:", SRC_PATH)
+print("Saving to:", EDGES_DIR)
+
+# Load original as grayscale
+img = Image.open(SRC_PATH).convert("L")
 arr = np.array(img, dtype=float)
 
 # Sobel kernels
@@ -31,43 +37,56 @@ gx = convolve(arr, KX, mode="reflect")
 gy = convolve(arr, KY, mode="reflect")
 mag = np.sqrt(gx**2 + gy**2)
 
-# ---- THICKEN EDGES (important change) ----
+# ---- THICKEN EDGES (blur + max filter) ----
+gx = gaussian_filter(gx, sigma=1.2)
+gy = gaussian_filter(gy, sigma=1.2)
+mag = gaussian_filter(mag, sigma=1.2)
 
-# First thickening pass
-gx = gaussian_filter(gx, sigma=1.6)
-gy = gaussian_filter(gy, sigma=1.6)
-mag = gaussian_filter(mag, sigma=1.6)
+# make strokes fatter
+gx = maximum_filter(gx, size=5)
+gy = maximum_filter(gy, size=5)
+mag = maximum_filter(mag, size=5)
 
-# Second pass (“soft dilation” using local max)
-gx = maximum_filter(gx, size=3)
-gy = maximum_filter(gy, size=3)
-mag = maximum_filter(mag, size=3)
 
 def norm255(a, gamma=0.45, floor=90, clip_low=10):
     """
-    Extra bold edges:
-    - gamma < 0.5 = boosts even mid-low responses
-    - floor = guarantees minimum visibility
-    - clip_low removes tiny specks
+    Map gradient magnitudes to 0–255 with:
+      - hard suppression of tiny responses (clip_low)
+      - gamma < 1 to boost midtones
+      - 'floor' only applied to nonzero edges
+    Background stays pure black.
     """
-    m = np.max(np.abs(a))
+    a_abs = np.abs(a)
+    m = np.max(a_abs)
     if m == 0:
         return np.zeros_like(a, dtype=np.uint8)
 
-    n = np.abs(a) / m
-    n[n < (clip_low / 255.0)] = 0.0
-    n = np.power(n, gamma)
-    n = floor + (255 - floor) * n
-    n = np.clip(n, 0, 255)
+    # normalize
+    n = a_abs / m
 
-    return n.astype(np.uint8)
+    # suppress tiny gradient responses
+    n[n < (clip_low / 255.0)] = 0.0
+
+    # allocate output
+    out = np.zeros_like(a_abs, dtype=np.float32)
+
+    # only apply gamma + floor where there is an edge
+    mask = n > 0
+    if np.any(mask):
+        v = n[mask] ** gamma
+        v = floor + (255 - floor) * v
+        out[mask] = v
+
+    out = np.clip(out, 0, 255)
+    return out.astype(np.uint8)
+
 
 gx_n  = norm255(gx)
 gy_n  = norm255(gy)
 mag_n = norm255(mag)
 
 # ======================================
-# Color palettes
+# Color palettes (pastel / bright)
 # ======================================
 
 LIGHT_RED  = np.array([255, 110, 110])   # soft light red
@@ -75,20 +94,24 @@ BABY_BLUE  = np.array([120, 190, 255])   # baby blue
 LIME_GREEN = np.array([140, 255, 120])   # lime green
 
 # ======================================
-# Apply color
+# Apply color on black background
 # ======================================
 
 gx_rgb  = np.zeros((*gx_n.shape, 3), dtype=np.uint8)
 gy_rgb  = np.zeros((*gy_n.shape, 3), dtype=np.uint8)
 mag_rgb = np.zeros((*mag_n.shape, 3), dtype=np.uint8)
 
+scale_gx  = gx_n.astype(np.float32) / 255.0
+scale_gy  = gy_n.astype(np.float32) / 255.0
+scale_mag = mag_n.astype(np.float32) / 255.0
+
 for c in range(3):
-    gx_rgb[..., c]  = (gx_n / 255.0) * LIGHT_RED[c]
-    gy_rgb[..., c]  = (gy_n / 255.0) * BABY_BLUE[c]
-    mag_rgb[..., c] = (mag_n / 255.0) * LIME_GREEN[c]
+    gx_rgb[..., c]  = (scale_gx  * LIGHT_RED[c]).astype(np.uint8)
+    gy_rgb[..., c]  = (scale_gy  * BABY_BLUE[c]).astype(np.uint8)
+    mag_rgb[..., c] = (scale_mag * LIME_GREEN[c]).astype(np.uint8)
 
-Image.fromarray(gx_rgb.astype(np.uint8)).save(edges_dir / "memory_edge_x.png")
-Image.fromarray(gy_rgb.astype(np.uint8)).save(edges_dir / "memory_edge_y.png")
-Image.fromarray(mag_rgb.astype(np.uint8)).save(edges_dir / "memory_edge_mag.png")
+Image.fromarray(gx_rgb).save(EDGES_DIR / "memory_edge_x.png")
+Image.fromarray(gy_rgb).save(EDGES_DIR / "memory_edge_y.png")
+Image.fromarray(mag_rgb).save(EDGES_DIR / "memory_edge_mag.png")
 
-print("Saved EXTRA thick, high-contrast pastel edge maps to:", edges_dir)
+print("Saved edge maps to:", EDGES_DIR)
