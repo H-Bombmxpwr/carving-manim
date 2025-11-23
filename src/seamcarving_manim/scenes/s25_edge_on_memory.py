@@ -1,0 +1,162 @@
+from manim import *
+from importlib.resources import files
+from pathlib import Path
+from PIL import Image
+import numpy as np
+
+from seamcarving_manim.style import H1, caption
+
+
+class EdgeOnMemoryScene(Scene):
+    def construct(self):
+        self.camera.background_color = BLACK
+
+        TITLE_RT = 0.8
+        CAP_RT   = 0.8
+        HOLD     = 1.2
+
+        # --- title ---
+        title = H1("Edges on The Persistence of Memory").to_edge(UP, buff=0.5)
+        self.play(Write(title), run_time=TITLE_RT)
+        self.wait(0.4)
+
+        # --- load images from assets ---
+        # Original painting
+        orig_path = files("seamcarving_manim.assets.images").joinpath("memory.jpg")
+
+        # Edges live in the same images package, in subdir memory_edges
+        edges_dir = files("seamcarving_manim.assets.images").joinpath("memory_edges")
+
+        ex_path = Path(str(edges_dir / "memory_edge_x.png"))
+        ey_path = Path(str(edges_dir / "memory_edge_y.png"))
+        em_path = Path(str(edges_dir / "memory_edge_mag.png"))
+
+        # Use arrays so Manim doesn't try to resolve via assets_dir
+        orig = ImageMobject(np.array(Image.open(orig_path).convert("RGB"), dtype=np.uint8))
+
+        edge_x_arr   = np.array(Image.open(ex_path).convert("RGB"), dtype=np.uint8)
+        edge_y_arr   = np.array(Image.open(ey_path).convert("RGB"), dtype=np.uint8)
+        edge_mag_arr = np.array(Image.open(em_path).convert("RGB"), dtype=np.uint8)
+
+        edge_x   = ImageMobject(edge_x_arr)
+        edge_y   = ImageMobject(edge_y_arr)
+        edge_mag = ImageMobject(edge_mag_arr)
+
+        edge_x.set_z_index(100)
+        edge_y.set_z_index(100)
+        edge_mag.set_z_index(100)
+        orig.set_z_index(100)
+
+
+
+
+        # unify sizes
+        DISP_H = 4.2
+        for m in [orig, edge_x, edge_y, edge_mag]:
+            m.set_height(DISP_H)
+
+        # --- Step 1: original only ---
+        orig.move_to(ORIGIN)
+        self.play(FadeIn(orig, run_time=1.0))
+        cap_orig = caption("Original image: The Persistence of Memory (1931) — Salvador Dalí").to_edge(DOWN, buff=0.4)
+        self.play(FadeIn(cap_orig, shift=UP * 0.1), run_time=CAP_RT)
+        self.wait(HOLD * 1.3)
+
+        # --- Step 2: Sobel X (vertical edges) ---
+        self.play(
+            orig.animate.shift(LEFT * 3.6).scale(0.75),
+            FadeOut(cap_orig, shift=DOWN * 0.1),
+            run_time=1.0,
+        )
+
+        edge_x.next_to(orig, RIGHT, buff=0.8)
+
+        cap_x = caption("Sobel X: strong response at vertical edges (left–right changes)").to_edge(DOWN, buff=0.4)
+        self.play(
+            FadeIn(edge_x, shift=RIGHT * 0.3),
+            FadeIn(cap_x, shift=UP * 0.1),
+            run_time=1.0,
+        )
+        self.wait(HOLD * 1.3)
+
+        # pulse the edges a bit
+        self.play(edge_x.animate.scale(1.03), run_time=0.4)
+        self.play(edge_x.animate.scale(1 / 1.03), run_time=0.4)
+        self.wait(0.4)
+
+        # --- Step 3: Sobel Y (horizontal edges) ---
+        # slide to switch focus: original on right, Sobel Y on left
+        self.play(
+            FadeOut(edge_x),
+            FadeOut(cap_x, shift=DOWN * 0.1),
+            orig.animate.shift(RIGHT * 7.2),  # from left to right side
+            run_time=1.0,
+        )
+
+        
+        edge_y.next_to(orig, LEFT, buff=0.8)
+
+        cap_y = caption("Sobel Y: strong response at horizontal edges (up–down changes)").to_edge(DOWN, buff=0.4)
+        self.play(
+            FadeIn(edge_y, shift=LEFT * 0.3),
+            FadeIn(cap_y, shift=UP * 0.1),
+            run_time=1.0,
+        )
+        self.wait(HOLD * 1.3)
+
+        self.play(edge_y.animate.scale(1.03), run_time=0.4)
+        self.play(edge_y.animate.scale(1 / 1.03), run_time=0.4)
+        self.wait(0.4)
+
+        # --- Step 4: bring both edges in and combine into full edge map ---
+       # --- Step 4: bring both edges in and combine into full edge map ---
+        self.play(
+            FadeOut(cap_y, shift=DOWN * 0.1),
+            FadeOut(orig),
+            FadeOut(edge_y), 
+            run_time=0.7,
+        )
+
+
+        # small X and Y on left/right, combined in center
+        edge_x_small = edge_x.copy().set_color(RED).set_height(3.0)
+        edge_y_small = edge_y.copy().set_color(BLUE).set_height(3.0)
+        
+
+        edge_mag.move_to(ORIGIN)
+        edge_x_small.next_to(edge_mag, LEFT, buff=0.8)
+        edge_y_small.next_to(edge_mag, RIGHT, buff=0.8)
+
+        self.play(
+            FadeIn(edge_x_small, shift=LEFT * 0.3),
+            FadeIn(edge_y_small, shift=RIGHT * 0.3),
+            run_time=1.0,
+        )
+
+        cap_combine = caption("Combine |∂I/∂x| and |∂I/∂y| → full edge map |∇I|").to_edge(DOWN, buff=0.4)
+        self.play(FadeIn(cap_combine, shift=UP * 0.1), run_time=CAP_RT)
+        self.wait(HOLD)
+
+        # "Cool" combination animation: X + Y collapse into center and crossfade to |∇I|
+        edge_mag.set_opacity(0)
+        self.add(edge_mag)
+
+        self.play(
+            edge_x_small.animate.move_to(edge_mag.get_center()).scale(0.9),
+            edge_y_small.animate.move_to(edge_mag.get_center()).scale(0.9),
+            run_time=1.0,
+        )
+
+        self.play(
+            edge_mag.animate.set_opacity(1.0),
+            edge_x_small.animate.set_opacity(0.0),
+            edge_y_small.animate.set_opacity(0.0),
+            run_time=1.5,
+        )
+
+        self.remove(edge_x_small, edge_y_small)
+        self.wait(HOLD * 2)
+
+        # final beat: zoom the edge map slightly
+        self.play(edge_mag.animate.scale(1.05), run_time=0.6)
+        self.wait(1.0)
