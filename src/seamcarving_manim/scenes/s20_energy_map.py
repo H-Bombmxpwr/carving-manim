@@ -11,7 +11,7 @@ class EdgeDetectionScene(Scene):
         self.camera.background_color = "#0a0a0a"
         TITLE_RT = 0.8
         CAP_RT = 0.8
-        HOLD = 1.2
+        HOLD = 3
         CONV_STEP_TIME = 0.15
 
         # ---- title ----
@@ -75,7 +75,7 @@ class EdgeDetectionScene(Scene):
 
         grid.shift(LEFT * 4.5)
 
-        intro_cap = caption("Grayscale circle with smooth gradient edges").next_to(
+        intro_cap = caption("Simple grayscale circle").next_to(
             grid, DOWN, buff=0.5
         )
         self.play(
@@ -329,6 +329,7 @@ class EdgeDetectionScene(Scene):
 
         result_x_grid = VGroup()
         result_x_squares = {}
+        result_x_texts = VGroup()
 
         sobel_x_kernel = np.array(sobel_x_values)
         grad_x = convolve(circle_pattern.astype(float), sobel_x_kernel, mode="constant")
@@ -406,6 +407,7 @@ class EdgeDetectionScene(Scene):
 
                 result_x_squares[(i, j)].set_opacity(1)
                 self.add(result_text)
+                result_x_texts.add(result_text)
 
                 self.wait(CONV_STEP_TIME)
                 self.remove(kernel_overlay)
@@ -451,12 +453,14 @@ class EdgeDetectionScene(Scene):
         self.wait(HOLD * 1.5)
 
         self.play(
-            FadeOut(vector_x_cap, shift=DOWN * 0.1),
+            FadeOut(vector_x_cap, shift=DOWN*0.1),
             FadeOut(result_x_grid),
             FadeOut(result_x_label),
             FadeOut(x_vectors),
-            run_time=1.0,
+            FadeOut(result_x_texts),
+            run_time=1.0
         )
+
         self.wait(0.5)
 
         # ---- Part 2: Apply Sobel Y (NOW MIRRORS SOBEL X FLOW) ----
@@ -483,6 +487,7 @@ class EdgeDetectionScene(Scene):
 
         result_y_grid = VGroup()
         result_y_squares = {}
+        result_y_texts = VGroup()
 
         sobel_y_kernel = np.array(sobel_y_values)
         grad_y = convolve(circle_pattern.astype(float), sobel_y_kernel, mode="constant")
@@ -561,6 +566,7 @@ class EdgeDetectionScene(Scene):
 
                 result_y_squares[(i, j)].set_opacity(1)
                 self.add(result_text)
+                result_y_texts.add(result_text)
 
                 self.wait(CONV_STEP_TIME)
                 self.remove(kernel_overlay)
@@ -611,6 +617,7 @@ class EdgeDetectionScene(Scene):
             FadeOut(result_y_grid),
             FadeOut(result_y_label),
             FadeOut(y_vectors),
+            FadeOut(result_y_texts),
             run_time=1.0,
         )
         self.wait(0.5)
