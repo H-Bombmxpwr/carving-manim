@@ -41,6 +41,7 @@ class EdgeDetectionScene(Scene):
         pixel_size = 0.45
         grid = VGroup()
         pixel_squares = {}
+        intensity_texts = VGroup()
 
         for i in range(size):
             for j in range(size):
@@ -72,6 +73,7 @@ class EdgeDetectionScene(Scene):
 
                 pixel_squares[(i, j)] = square
                 grid.add(square, intensity_text)
+                intensity_texts.add(intensity_text)
 
         grid.shift(LEFT * 4.5)
 
@@ -366,9 +368,8 @@ class EdgeDetectionScene(Scene):
         result_x_grid.set_opacity(0)  # group opacity
         self.add(result_x_grid)
 
-        result_x_label = Text(
-            "∂I/∂x", font_size=24, color=RED
-        ).next_to(result_x_grid, DOWN, buff=0.3)
+        result_x_label = Text("∂I/∂x", font_size=24, color=RED).next_to(result_x_grid, UP, buff=0.25)
+
 
         self.play(
             FadeOut(sobel_x_matrix),
@@ -524,9 +525,8 @@ class EdgeDetectionScene(Scene):
         result_y_grid.set_opacity(0)
         self.add(result_y_grid)
 
-        result_y_label = Text(
-            "∂I/∂y", font_size=24, color=BLUE
-        ).next_to(result_y_grid, DOWN, buff=0.3)
+        result_y_label = Text("∂I/∂y", font_size=24, color=BLUE).next_to(result_y_grid, UP, buff=0.25)
+
 
         # fade out Y kernel before the step-by-step conv, just like X
         self.play(
@@ -631,6 +631,7 @@ class EdgeDetectionScene(Scene):
 
         self.play(
             grid.animate.shift(RIGHT * 4.5),
+            FadeOut(intensity_texts),
             run_time=1.0,
         )
 
