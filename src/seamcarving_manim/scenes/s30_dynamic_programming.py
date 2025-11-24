@@ -58,7 +58,7 @@ class EnergyGridSeamsScene(Scene):
 
                 grid_group.add(sq, txt)
 
-        grid_group.move_to(ORIGIN)
+        grid_group.shift(LEFT * 3)
 
         cap_grid = caption(
             "Per-pixel energies e(i, j) (brighter = higher energy)"
@@ -241,3 +241,156 @@ class EnergyGridSeamsScene(Scene):
         best_seam_mobj = make_seam_boxes(best_path, color=GREEN)
         self.play(FadeIn(best_seam_mobj), run_time=1.0)
         self.wait(HOLD * 2)
+
+        # =====================================================
+        # Phase 3: Dynamic Programming - Min Energy to Bottom
+        # =====================================================
+        self.play(
+            FadeOut(min_cap),
+            FadeOut(best_seam_mobj),
+            FadeOut(all_cap),
+            FadeOut(sum_text),
+            FadeOut(count_text),
+            FadeOut(best_text),
+            run_time=0.6
+        )
+
+        dp_cap = caption(
+            "Dynamic Programming: compute 'minimum energy to bottom' for each cell"
+        ).next_to(cap_grid, DOWN, buff=0.2)
+        self.play(FadeIn(dp_cap, shift=UP * 0.1), run_time=0.6)
+
+        # Build DP grid on the RIGHT
+        dp_grid_group = VGroup()
+        dp_squares = {}
+        dp_texts = {}
+
+        for i in range(n_rows):
+            for j in range(n_cols):
+                sq = Square(
+                    side_length=cell_size,
+                    stroke_color=ORANGE,
+                    stroke_width=2,
+                    fill_color=BLACK,
+                    fill_opacity=0.8,
+                )
+
+                x = (j - (n_cols - 1) / 2) * cell_size
+                y = ((n_rows - 1) / 2 - i) * cell_size
+                sq.move_to([x, y, 0])
+
+                dp_squares[(i, j)] = sq
+                dp_grid_group.add(sq)
+
+        dp_grid_group.shift(RIGHT * 3)
+
+        dp_label = Text("Min Energy to Bottom", font_size=24, color=ORANGE).next_to(dp_grid_group, UP, buff=0.3)
+
+        self.play(
+            LaggedStart(
+                *[FadeIn(sq, shift=0.15 * UP) for sq in dp_grid_group],
+                lag_ratio=0.03,
+            ),
+            FadeIn(dp_label),
+            run_time=1.5,
+        )
+        self.wait(HOLD)
+
+        # Compute DP values: dp[i][j] = min energy from (i,j) to bottom
+        dp = [[0.0 for _ in range(n_cols)] for _ in range(n_rows)]
+
+        # Bottom row: just the energy itself
+        for j in range(n_cols):
+            dp[n_rows - 1][j] = values[n_rows - 1][j]
+
+        # Fill from bottom to top
+        for i in range(n_rows - 2, -1, -1):
+            for j in range(n_cols):
+                # Min of three neighbors below
+                min_below = float('inf')
+                for dj in (-1, 0, 1):
+                    jj = j + dj
+                    if 0 <= jj < n_cols:
+                        min_below = min(min_below, dp[i + 1][jj])
+                dp[i][j] = values[i][j] + min_below
+
+        # Animate filling DP grid from bottom to top
+        fill_cap = caption("Filling bottom-up: dp[i][j] = e[i][j] + min(dp[i+1][j-1:j+1])").to_edge(DOWN, buff=0.5)
+        self.play(FadeIn(fill_cap, shift=UP * 0.1), run_time=0.6)
+
+        for i in range(n_rows - 1, -1, -1):
+            for j in range(n_cols):
+                val = dp[i][j]
+                txt = Text(f"{val:.1f}", font_size=28, color=YELLOW)
+                txt.move_to(dp_squares[(i, j)].get_center())
+                dp_texts[(i, j)] = txt
+
+                self.play(FadeIn(txt), run_time=0.15)
+
+        self.wait(HOLD)
+
+        # =====================================================
+        # Phase 4: Trace optimal path using DP
+        # =====================================================
+        self.play(FadeOut(fill_cap), FadeOut(dp_cap), run_time=0.4)
+
+        trace_cap = caption(
+            "Trace optimal path: start at minimum in top row, follow minimum neighbors downward"
+        ).to_edge(DOWN, buff=0.5)
+        self.play(FadeIn(trace_cap, shift=UP * 0.1), run_time=0.6)
+
+        # Find starting column (minimum dp value in top row)
+        start_col = min(range(n_cols), key=lambda j: dp[0][j])
+
+        # Trace path
+        dp_path = [(0, start_col)]
+        j = start_col
+        for i in range(1, n_rows):
+            candidates = []
+            for dj in (-1, 0, 1):
+                jj = j + dj
+                if 0 <= jj < n_cols:
+                    candidates.append(jj)
+            j = min(candidates, key=lambda c: dp[i][c])
+            dp_path.append((i, j))
+
+        # Highlight path on DP grid
+        dp_path_highlights = VGroup()
+        for (i, j) in dp_path:
+            sq = dp_squares[(i, j)]
+            hl = (
+                sq.copy()
+                .set_fill(color=GREEN, opacity=0.4)
+                .set_stroke(GREEN, width=4)
+            )
+            hl.move_to(sq.get_center())
+            dp_path_highlights.add(hl)
+
+            self.play(FadeIn(hl), run_time=0.2)
+
+        self.wait(HOLD)
+
+        # Show that this matches the brute force optimal path
+        final_cap = caption(
+            f"DP optimal path energy = {dp[0][start_col]:.1f} (matches brute force!)"
+        ).to_edge(DOWN, buff=0.5)
+        self.play(
+            FadeOut(trace_cap),
+            FadeIn(final_cap, shift=UP * 0.1),
+            run_time=0.6
+        )
+
+        # Highlight same path on original grid
+        original_path_highlights = VGroup()
+        for (i, j) in dp_path:
+            sq = cell_squares[(i, j)]
+            hl = (
+                sq.copy()
+                .set_fill(color=GREEN, opacity=0.4)
+                .set_stroke(GREEN, width=4)
+            )
+            hl.move_to(sq.get_center())
+            original_path_highlights.add(hl)
+
+        self.play(FadeIn(original_path_highlights), run_time=1.0)
+        self.wait(HOLD * 3)
