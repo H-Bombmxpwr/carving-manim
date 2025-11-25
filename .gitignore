@@ -46,3 +46,8 @@ Thumbs.db
 # --- Local config you don’t want in git ---
 *.env
 *.env.*
+
+
+# Precomputed seam carving frames (do not commit)
+src/seamcarving_manim/assets/images/memory_dual/
+src/seamcarving_manim/assets/images/memory_carved/
