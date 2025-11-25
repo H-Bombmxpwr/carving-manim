@@ -19,7 +19,7 @@ class EnergyGridSeamsScene(Scene):
         DP_GRID_FADEIN_TIME = 1.5
         DP_BOTTOM_ROW_TIME = 0.2
         DP_SECOND_ROW_WAIT = 1.5
-        DP_SECOND_ROW_FILL_TIME = 0.3
+        DP_SECOND_ROW_FILL_TIME = 2
         DP_SHOW_FORMULA_TIME = 1.0
         DP_REST_FILL_TIME = 0.08
         DP_PATH_TRACE_TIME = 0.2
@@ -285,12 +285,13 @@ class EnergyGridSeamsScene(Scene):
             FadeOut(sum_text),
             FadeOut(count_text),
             FadeOut(best_text),
+            FadeOut(cap_grid),  # make sure the per-pixel caption is gone now
             run_time=0.6,
         )
 
         dp_cap = caption(
-            "Dynamic Programming: compute 'minimum energy to bottom' for each cell"
-        ).next_to(cap_grid, DOWN, buff=0.2)
+            "Dynamic Programming: compute 'minimum energy to bottom'"
+        ).next_to(grid_group, DOWN, buff=0.4)
         self.play(FadeIn(dp_cap, shift=UP * 0.1), run_time=CAPTION_TIME)
 
         # Build DP grid on the RIGHT with orange theming
@@ -353,6 +354,7 @@ class EnergyGridSeamsScene(Scene):
         fill_cap = caption("Bottom row: min energy = current energy").to_edge(
             DOWN, buff=0.5
         )
+        self.play(FadeOut(dp_cap))
         set_bottom_caption(fill_cap)
 
         # Find max DP value for gradient normalization (for orange gradient)
@@ -377,102 +379,97 @@ class EnergyGridSeamsScene(Scene):
         # Pause after filling bottom row
         self.wait(DP_SECOND_ROW_WAIT)
 
-        # --- Second-to-last row: detailed equation for first cell + gradient ---
+        # --- Second-to-last row: detailed equations for two cells + gradient ---
         formula_cap = caption(
             "Each cell: dp[i][j] = e[i][j] + min(neighbors below)"
         ).to_edge(DOWN, buff=0.5)
         set_bottom_caption(formula_cap)
 
-        i = n_rows - 2
-        j = 0  # first cell in this row
+        row_i = n_rows - 2
 
-        val = dp[i][j]
+        def animate_dp_cell(i, j, wait_after=True, bg_color=GRAY_E):
+            """Show detailed equation for dp[i][j] using both grids, with background."""
 
-        # Highlight corresponding ORIGINAL cell on the left
-        current_highlight = cell_squares[(i, j)].copy().set_stroke(YELLOW, width=5)
-        self.play(Create(current_highlight), run_time=0.3)
-
-        # Show connections from DP cell to neighbors below in DP grid
-        connections = VGroup()
-        neighbor_vals = []
-        for dj in (-1, 0, 1):
-            jj = j + dj
-            if 0 <= jj < n_cols:
-                line = Line(
-                    dp_squares[(i, j)].get_center(),
-                    dp_squares[(i + 1, jj)].get_center(),
-                    color=YELLOW,
-                    stroke_width=3,
-                )
-                connections.add(line)
-                neighbor_vals.append(dp[i + 1][jj])
-
-        self.play(Create(connections), run_time=0.5)
-
-        # Equation: e[i,j] (from left grid) + min(dp neighbors below) (from right grid)
-        current_energy = values[i][j]
-        min_neighbor = min(neighbor_vals)
-
-        eq_start_pos = cell_squares[(i, j)].get_center()
-        energy_text = Text(
-            f"{current_energy:.1f}", font_size=24, color=WHITE
-        ).move_to(eq_start_pos)
-        self.play(FadeIn(energy_text, scale=1.2), run_time=0.3)
-
-        plus_sign = Text("+", font_size=24, color=YELLOW).next_to(
-            energy_text, RIGHT, buff=0.1
-        )
-        self.play(FadeIn(plus_sign), run_time=0.2)
-
-        min_text = Text(
-            f"{min_neighbor:.1f}", font_size=24, color=YELLOW
-        ).next_to(plus_sign, RIGHT, buff=0.1)
-        self.play(FadeIn(min_text), run_time=0.3)
-
-        equals_sign = Text("=", font_size=24, color=GREEN).next_to(
-            min_text, RIGHT, buff=0.1
-        )
-        result_text = Text(f"{val:.1f}", font_size=24, color=GREEN).next_to(
-            equals_sign, RIGHT, buff=0.1
-        )
-        self.play(FadeIn(equals_sign), FadeIn(result_text), run_time=0.3)
-
-        self.wait(0.5)
-
-        # Animate equation group flying over to the DP grid cell (visual link between grids)
-        equation_group = VGroup(
-            energy_text, plus_sign, min_text, equals_sign, result_text
-        )
-        target_pos = dp_squares[(i, j)].get_center()
-
-        self.play(
-            equation_group.animate.move_to(target_pos).scale(0.5),
-            run_time=0.8,
-        )
-
-        # Replace with final DP text and orange gradient fill
-        txt = Text(f"{val:.1f}", font_size=28, color=YELLOW)
-        txt.move_to(dp_squares[(i, j)].get_center())
-        dp_texts[(i, j)] = txt
-
-        gradient_val = val / max_dp
-        fill_color = interpolate_color(BLACK, ORANGE, gradient_val)
-
-        self.play(
-            FadeOut(equation_group),
-            FadeIn(txt),
-            dp_squares[(i, j)].animate.set_fill(fill_color, opacity=1.0),
-            FadeOut(connections),
-            FadeOut(current_highlight),
-            run_time=0.5,
-        )
-
-        # Pause after doing the "explainy" cell
-        self.wait(DP_SHOW_FORMULA_TIME)
-
-        # Fill the rest of the second-to-last row quickly, with the same orange gradient logic
-        for j in range(1, n_cols):
             val = dp[i][j]
+
+            # Highlight corresponding ORIGINAL cell on the left
+            current_highlight = (
+                cell_squares[(i, j)].copy().set_stroke(YELLOW, width=5)
+            )
+            self.play(Create(current_highlight), run_time=0.3)
+
+            # Connections to neighbors below in DP grid
+            connections = VGroup()
+            neighbor_vals = []
+            for dj in (-1, 0, 1):
+                jj = j + dj
+                if 0 <= jj < n_cols:
+                    line = Line(
+                        dp_squares[(i, j)].get_center(),
+                        dp_squares[(i + 1, jj)].get_center(),
+                        color=YELLOW,
+                        stroke_width=3,
+                    )
+                    connections.add(line)
+                    neighbor_vals.append(dp[i + 1][jj])
+
+            self.play(Create(connections), run_time=0.4)
+
+            # Equation: e[i,j] (from left grid) + min(dp neighbors below) (from right grid)
+            current_energy = values[i][j]
+            min_neighbor = min(neighbor_vals)
+
+            eq_start_pos = cell_squares[(i, j)].get_center()
+            energy_text = Text(
+                f"{current_energy:.1f}", font_size=24, color=WHITE
+            ).move_to(eq_start_pos)
+
+            # Lay out locally around the energy_text
+            plus_sign = Text("+", font_size=24, color=YELLOW).next_to(
+                energy_text, RIGHT, buff=0.1
+            )
+            min_text = Text(
+                f"{min_neighbor:.1f}", font_size=24, color=YELLOW
+            ).next_to(plus_sign, RIGHT, buff=0.1)
+            equals_sign = Text("=", font_size=24, color=GREEN).next_to(
+                min_text, RIGHT, buff=0.1
+            )
+            result_text = Text(f"{val:.1f}", font_size=24, color=GREEN).next_to(
+                equals_sign, RIGHT, buff=0.1
+            )
+
+            equation_group = VGroup(
+                energy_text, plus_sign, min_text, equals_sign, result_text
+            )
+            # Center the equation group at the original cell
+            equation_group.move_to(eq_start_pos)
+
+            # Background rectangle behind the equation (for readability)
+            bg_rect = RoundedRectangle(
+                corner_radius=0.15,
+                width=equation_group.width + 0.3,
+                height=equation_group.height + 0.25,
+                stroke_width=1,
+                stroke_color=GRAY_D,
+                fill_color=bg_color,
+                fill_opacity=0.9,
+            )
+            bg_rect.move_to(eq_start_pos)
+
+            full_group = VGroup(bg_rect, equation_group)
+
+            self.play(FadeIn(full_group, scale=1.1), run_time=0.4)
+            if wait_after:
+                self.wait(0.3)
+
+            # Animate equation group flying over to the DP grid cell (visual link between grids)
+            target_pos = dp_squares[(i, j)].get_center()
+            self.play(
+                full_group.animate.move_to(target_pos).scale(0.5),
+                run_time=0.8,
+            )
+
+            # Replace with final DP text and orange gradient fill
             txt = Text(f"{val:.1f}", font_size=28, color=YELLOW)
             txt.move_to(dp_squares[(i, j)].get_center())
             dp_texts[(i, j)] = txt
@@ -481,7 +478,36 @@ class EnergyGridSeamsScene(Scene):
             fill_color = interpolate_color(BLACK, ORANGE, gradient_val)
 
             self.play(
+                FadeOut(full_group),
+                FadeIn(txt),
                 dp_squares[(i, j)].animate.set_fill(fill_color, opacity=1.0),
+                FadeOut(connections),
+                FadeOut(current_highlight),
+                run_time=0.6,
+            )
+
+            if wait_after:
+                self.wait(0.2)
+
+        # Detailed example for j = 0 and j = 1
+        animate_dp_cell(row_i, 0, wait_after=True)
+        animate_dp_cell(row_i, 1, wait_after=True)
+
+        # Pause after doing the detailed cells
+        self.wait(DP_SHOW_FORMULA_TIME)
+
+        # Fill the rest of the second-to-last row quickly, with the same orange gradient logic
+        for j in range(2, n_cols):
+            val = dp[row_i][j]
+            txt = Text(f"{val:.1f}", font_size=28, color=YELLOW)
+            txt.move_to(dp_squares[(row_i, j)].get_center())
+            dp_texts[(row_i, j)] = txt
+
+            gradient_val = val / max_dp
+            fill_color = interpolate_color(BLACK, ORANGE, gradient_val)
+
+            self.play(
+                dp_squares[(row_i, j)].animate.set_fill(fill_color, opacity=1.0),
                 FadeIn(txt),
                 run_time=DP_SECOND_ROW_FILL_TIME,
             )
