@@ -51,3 +51,4 @@ Thumbs.db
 # Precomputed seam carving frames (do not commit)
 src/seamcarving_manim/assets/images/memory_dual/
 src/seamcarving_manim/assets/images/memory_carved/
+src/seamcarving_manim/assets/images/failure_modes/
