@@ -182,7 +182,6 @@ class EdgeDetectionScene(Scene):
         )
         self.wait(HOLD)
 
-        self.play(FadeOut(explain_cap3, shift=DOWN * 0.1), run_time=0.3)
         explain_cap4 = caption(
             "Result: positive when bright→left, negative when dark→left"
         ).next_to(sobel_x_matrix, DOWN, buff=0.8)
@@ -629,11 +628,9 @@ class EdgeDetectionScene(Scene):
         combine_cap.set_color(GREEN)
         self.play(FadeIn(combine_cap, shift=UP * 0.1), run_time=CAP_RT)
 
-        self.play(
-            grid.animate.shift(RIGHT * 4.5),
-            FadeOut(intensity_texts),
-            run_time=1.0,
-        )
+        self.play(FadeOut(intensity_texts), run_time=0.4)
+        self.play(grid.animate.shift(RIGHT * 4.5), run_time=0.8)
+
 
         x_vectors_centered = VGroup()
         for i in range(1, size - 1):
