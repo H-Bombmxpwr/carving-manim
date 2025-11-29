@@ -182,4 +182,3 @@ class EdgeOnMemoryScene(Scene):
         self.wait(1.0)
 
         self.play(FadeOut(label_mag), run_time=0.6)
-
