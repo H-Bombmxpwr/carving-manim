@@ -9,10 +9,10 @@ class EnergyGridSeamsScene(Scene):
 
         # ===== TIMING PARAMETERS (in seconds) =====
         TITLE_RT = 0.8
-        HOLD = 1.2
+        HOLD = 3.2
         GRID_FADEIN_TIME = 2.0
-        CAPTION_TIME = 0.6
-        GREEDY_STEP_TIME = 0.25
+        CAPTION_TIME = 0.8
+        GREEDY_STEP_TIME = .75
         GREEDY_WAIT_TIME = 0.15
         BRUTE_FORCE_IN_TIME = 0.02
         BRUTE_FORCE_OUT_TIME = 0.01
@@ -23,7 +23,7 @@ class EnergyGridSeamsScene(Scene):
         DP_SHOW_FORMULA_TIME = 4
         DP_REST_FILL_TIME = 0.1
         DP_PATH_TRACE_TIME = 0.2
-        FINAL_HOLD = 7.0
+        FINAL_HOLD = 6.0
         # ==========================================
 
         # Helper to manage bottom-of-screen captions so they never overlap
@@ -169,17 +169,25 @@ class EnergyGridSeamsScene(Scene):
 
         self.wait(HOLD * 1.2)
 
+        # --- Greedy Big-O caption ---
+        greedy_big_o_cap = caption(
+            " O(n_rows × n_cols)"
+        ).next_to(sum_text, DOWN, buff=0.2)
+        self.play(FadeIn(greedy_big_o_cap, shift=UP * 0.1), run_time=CAPTION_TIME)
+        self.wait(HOLD*2.2)
+
         # =====================================================
         # Phase 2: Tree-style enumeration of all seams
         # =====================================================
         self.play(
             FadeOut(greedy_cap, shift=DOWN * 0.1),
             FadeOut(greedy_highlights),
+            FadeOut(greedy_big_o_cap),
             run_time=0.4,
         )
 
         all_cap = caption(
-            "Now explore all seams from that same starting pixel (tree of choices)"
+            "Now explore all seams from same starting pixel"
         ).next_to(cap_grid, DOWN, buff=0.2)
         self.play(FadeIn(all_cap, shift=UP * 0.1), run_time=CAPTION_TIME)
 
@@ -265,6 +273,13 @@ class EnergyGridSeamsScene(Scene):
 
         self.wait(HOLD)
 
+        # --- Brute-force Big-O caption ---
+        brute_big_o_cap = caption(
+            "O(3^n)"
+        ).next_to(best_text, DOWN, buff=0.2)
+        self.play(FadeIn(brute_big_o_cap, shift=UP * 0.1), run_time=CAPTION_TIME)
+        self.wait(HOLD)
+
         # Final: show the true minimum-energy seam as green boxes
         min_cap = caption(
             "Minimum-energy seam (among all explored combinations)"
@@ -285,6 +300,7 @@ class EnergyGridSeamsScene(Scene):
             FadeOut(sum_text),
             FadeOut(count_text),
             FadeOut(best_text),
+            FadeOut(brute_big_o_cap),
             FadeOut(cap_grid),  # make sure the per-pixel caption is gone now
             run_time=0.6,
         )
@@ -534,10 +550,16 @@ class EnergyGridSeamsScene(Scene):
 
         self.wait(HOLD)
 
+        # --- DP Big-O caption ---
+        dp_big_o_cap = caption(
+            "DP time: O(n_rows × n_cols)"
+        ).to_edge(DOWN, buff=0.5)
+        set_bottom_caption(dp_big_o_cap)
+        self.wait(HOLD)
+
         # =====================================================
         # Phase 4: Trace optimal path using DP (same start as greedy)
         # =====================================================
-        self.play(FadeOut(dp_cap), run_time=0.4)
 
         trace_cap = caption(
             "Trace optimal path: start at same position as greedy, follow minimum neighbors downward"

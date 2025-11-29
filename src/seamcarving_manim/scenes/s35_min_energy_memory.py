@@ -38,7 +38,7 @@ class MemoryMinEnergyBottomScene(Scene):
         # --------------------------------------------------
         # Title
         # --------------------------------------------------
-        title = H1("From Painting to Min-Energy Map").to_edge(UP, buff=0.4)
+        title = H1("From Persistence to Min-Energy Map").to_edge(UP, buff=0.4)
         self.play(Write(title), run_time=TITLE_RT)
 
         # --------------------------------------------------
