@@ -291,10 +291,10 @@ class EdgeDetectionScene(Scene):
                     FadeIn(calc, shift=LEFT * 0.2)
                     for calc in calculation_group[1:]
                 ],
-                lag_ratio=0.15,
+                lag_ratio=0.25,
             ),
             FadeIn(calc_title),
-            run_time=2.5,
+            run_time=4,
         )
         self.wait(HOLD * 1.5)
 

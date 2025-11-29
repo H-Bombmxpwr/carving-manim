@@ -18,12 +18,12 @@ class EnergyGridSeamsScene(Scene):
         BRUTE_FORCE_OUT_TIME = 0.01
         DP_GRID_FADEIN_TIME = 1.5
         DP_BOTTOM_ROW_TIME = 0.2
-        DP_SECOND_ROW_WAIT = 1.5
-        DP_SECOND_ROW_FILL_TIME = 2
-        DP_SHOW_FORMULA_TIME = 1.0
-        DP_REST_FILL_TIME = 0.08
+        DP_SECOND_ROW_WAIT = 1
+        DP_SECOND_ROW_FILL_TIME = 1
+        DP_SHOW_FORMULA_TIME = 4
+        DP_REST_FILL_TIME = 0.1
         DP_PATH_TRACE_TIME = 0.2
-        FINAL_HOLD = 3.0
+        FINAL_HOLD = 7.0
         # ==========================================
 
         # Helper to manage bottom-of-screen captions so they never overlap
@@ -460,13 +460,13 @@ class EnergyGridSeamsScene(Scene):
 
             self.play(FadeIn(full_group, scale=1.1), run_time=0.4)
             if wait_after:
-                self.wait(0.3)
+                self.wait(0.6)
 
             # Animate equation group flying over to the DP grid cell (visual link between grids)
             target_pos = dp_squares[(i, j)].get_center()
             self.play(
                 full_group.animate.move_to(target_pos).scale(0.5),
-                run_time=0.8,
+                run_time=2,
             )
 
             # Replace with final DP text and orange gradient fill
